@@ -4,10 +4,12 @@ import numpy as np
 import cv2
 import pyrealsense2 as rs
 import pandas as pd
+import logging
 from ArUcoDetector import ArUcoDetector
 from Camera import Camera
 from TrajectoryTracker import TrajectoryTracker
 from ArUcoGenerator import readConfig
+import math
 
 
 # ---------------- Kalman Filter for smoothing ----------------
@@ -34,11 +36,59 @@ class Kalman1D:
         self.x = self.x + K * (z - self.x)
         self.P = (1 - K) * self.P
         return self.x
+# ---------------- Rotation correction ----------------
+def rotation_matrix(rx, ry, rz):
+    """Builds a 3D rotation matrix from Euler angles (radians)."""
+    Rx = np.array([[1, 0, 0],
+                   [0, math.cos(rx), -math.sin(rx)],
+                   [0, math.sin(rx), math.cos(rx)]])
+    Ry = np.array([[math.cos(ry), 0, math.sin(ry)],
+                   [0, 1, 0],
+                   [-math.sin(ry), 0, math.cos(ry)]])
+    Rz = np.array([[math.cos(rz), -math.sin(rz), 0],
+                   [math.sin(rz), math.cos(rz), 0],
+                   [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+def compute_y_tilt(z_left, z_right, table_width):
+    """Compute Y-axis tilt angle in radians."""
+    delta_z = z_right - z_left
+    slope = delta_z / table_width
+    return math.atan(slope)
+def compute_x_tilt(z_up, z_down, table_length):
+    """Compute X-axis tilt angle in radians."""
+    delta_z = z_up - z_down
+    slope = delta_z / table_length
+    return math.atan(slope)
+
+def get_correction_matrix(z_left, z_right, table_width ):
+    """Return correction rotation matrix based on table measurements."""
+    ry = compute_y_tilt(z_left, z_right, table_width)
+    rx = compute_x_tilt(z_up, z_down, table_length)
+    return rotation_matrix(rx, ry, 0)
+
+# ---------------- Example usage ----------------
+z_up = 770
+z_down = 768
+z_left = 790   # mm
+z_right = 768  # mm
+table_width = 740  # mm (370+370)
+table_length = 740  # mm (370+370)
+
+R_align = get_correction_matrix(z_left, z_right, table_width)
 
 
 def main():
+    # ---------------- Setup logger ----------------
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler()]
+    )
+
     dict_to_use, visualize, grey_color, _ = readConfig(
-        "/home/kareem-saleh/camera_tracking/RealsenseArUcoTracking/config.json")
+        "/home/kareem-saleh/Aruco_Marker detector_Final/RealsenseArUcoTracking/RealsenseArUcoTracking/config.json"
+    )
 
     # ---------------- Load calibration from YAML ----------------
     with open("realsense_calib.yaml", "r") as f:
@@ -48,27 +98,32 @@ def main():
     K = np.array(calib["camera_matrix"]["data"], dtype=np.float64).reshape(3, 3)
     D = np.array(calib["dist_coeffs"]["data"], dtype=np.float64)
 
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+
     # Depth scale & correction
     depth_scale = float(calib.get("depth_scale", 0.001))
     a = float(calib.get("depth_correction", {}).get("a", 1.0))
     b = float(calib.get("depth_correction", {}).get("b", 1.0))
 
-    print("[INFO] Calibration loaded")
-    print("K:\n", K)
-    print("D:", D)
-    print(f"depth_scale={depth_scale}, depth_correction: a={a}, b={b}")
+    logging.info("Calibration loaded")
+    logging.info(f"K:\n{K}")
+    logging.info(f"D: {D}")
+    logging.info(f"depth_scale={depth_scale}, depth_correction: a={a}, b={b}")
 
     # ---------------- ABB base frame relative to camera ----------------
     def cam_to_base_pos(t_cam):
         """
-        t_cam: (3,) position in camera frame (meters) from ArUco pose
+        t_cam: (3,) position in camera frame (meters) from ArUco pose or depth
         Returns (3,) position in ABB base frame (meters)
         """
-        x_c, y_c, z_c = t_cam
+        t_cam_rot = R_align @ t_cam
+
+        x_c, y_c, z_c = t_cam_rot
         x_b = x_c - 0.05
         y_b = y_c + 0.67
-        z_b = 0.769 - z_c  # reversed Z with offset at table plane
-        return np.array([y_b, x_b, z_b], dtype=np.float64)
+        z_b = 0.773 - z_c  # reversed Z with offset at table plane
+        return np.array([y_b, -x_b, z_b], dtype=np.float64)
 
     # ---------------- Your pipeline / classes ----------------
     arucoDetector = ArUcoDetector(dict_to_use)
@@ -76,9 +131,10 @@ def main():
     camera = Camera()
     camera.startStreaming()
 
-    profile = camera.pipeline.get_active_profile()
-    depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
-    _depth_intrinsics = depth_profile.get_intrinsics()
+    # --- RealSense filters ---
+    spatial = rs.spatial_filter()
+    temporal = rs.temporal_filter()
+    hole_filling = rs.hole_filling_filter()
 
     marker_size = 0.08  # meters (adjust to your printed marker)
     corner_data = []
@@ -86,44 +142,21 @@ def main():
     # Kalman filters per marker for X, Y, Z
     pos_filters = {}
 
-    # --- Setup RealSense filters ---
-    spatial = rs.spatial_filter()
-    temporal = rs.temporal_filter()
-    hole_filling = rs.hole_filling_filter()
-
-
     try:
         while True:
-            frameset = camera.getNextFrame()
+            frame = camera.getNextFrame()
+            depth_image, color_image = camera.extractImagesFromFrame(frame)
 
-            # --- Get raw frames ---
-            depth_frame = frameset.get_depth_frame()
-            color_frame = frameset.get_color_frame()
-
-            if not depth_frame or not color_frame:
-                continue
-
-            # --- Apply filters on depth frame ---
-            filtered_depth = spatial.process(depth_frame)
-            filtered_depth = temporal.process(filtered_depth)
-            filtered_depth = hole_filling.process(filtered_depth)
-
-            # --- Convert to numpy ---
-            depth_image = np.asanyarray(filtered_depth.get_data())
-            color_image = np.asanyarray(color_frame.get_data())
-            # Undistort image
             h, w = color_image.shape[:2]
-            _new_K, _ = cv2.getOptimalNewCameraMatrix(K, D, (w, h), 1)
-            undistorted = cv2.undistort(color_image, K, None, None, None)
+            # No extra undistort since RealSense already outputs rectified frames
 
             # Detect ArUco markers
             corners, ids, rvecs, tvecs = arucoDetector.detect_with_pose_estimation(
-                undistorted, K, None, marker_size
+                color_image, K, None, marker_size
             )
 
-            # ---- Subpixel corner refinement ----
-            if corners is not None:
-                gray = cv2.cvtColor(undistorted, cv2.COLOR_BGR2GRAY)
+            if ids is not None:
+                gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
                 for corner in corners:
                     cv2.cornerSubPix(
                         gray,
@@ -133,16 +166,33 @@ def main():
                         criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.01)
                     )
 
-            if ids is not None:
                 for i, markerID in enumerate(ids.flatten()):
-                    tvec_marker = tvecs[i].flatten()  # camera frame (meters)
+                    tvec_pnp = tvecs[i].flatten()  # camera frame (PnP)
                     rvec_marker = rvecs[i].flatten()
 
-                    # --- Base-frame position from ArUco pose (raw) ---
-                    base_pos = cam_to_base_pos(tvec_marker)
-                    raw_base_pos = base_pos.copy()
+                    # --- Depth from RealSense at marker center ---
+                    u_center = int(corners[i][0].mean(axis=0)[0])
+                    v_center = int(corners[i][0].mean(axis=0)[1])
+                    depth_value = depth_image[v_center, u_center] * 0.001
 
-                    # --- Create Kalman filters if first time seeing this marker ---
+                    if depth_value >= 0:  # valid depth
+                        X = (u_center - cx) * depth_value / fx
+                        Y = (v_center - cy) * depth_value / fy
+                        Z = depth_value
+                        tvec_depth = np.array([X, Y, Z], dtype=np.float64)
+                    else:
+                        tvec_depth = None
+
+                    # --- Base-frame positions ---
+                    base_pos_pnp = cam_to_base_pos(tvec_pnp)
+                    base_pos_depth = cam_to_base_pos(tvec_depth) if tvec_depth is not None else None
+
+                    # --- Fusion: take XY from PnP, Z from depth if available ---
+                    fused_pos = base_pos_pnp.copy()
+                    if base_pos_depth is not None:
+                        fused_pos[2] = base_pos_depth[2]
+
+                    # --- Kalman filtering ---
                     if markerID not in pos_filters:
                         pos_filters[markerID] = {
                             "x": Kalman1D(process_variance=1e-5, measurement_variance=1e-3),
@@ -150,49 +200,56 @@ def main():
                             "z": Kalman1D(process_variance=1e-5, measurement_variance=1e-3)
                         }
 
-                    # --- Apply Kalman filters to X, Y, Z ---
-                    base_pos[0] = pos_filters[markerID]["x"].filter(base_pos[0])
-                    base_pos[1] = pos_filters[markerID]["y"].filter(base_pos[1])
-                    base_pos[2] = pos_filters[markerID]["z"].filter(base_pos[2])
+                    fused_pos[0] = pos_filters[markerID]["x"].filter(fused_pos[0])
+                    fused_pos[1] = pos_filters[markerID]["y"].filter(fused_pos[1])
+                    fused_pos[2] = pos_filters[markerID]["z"].filter(fused_pos[2])
 
-                    # Print & log
-                    print(f"[ID {markerID}] Base frame (m): "
-                          f"X(filt)={base_pos[0]:.3f}, "
-                          f"Y(filt)={base_pos[1]:.3f}, "
-                          f"Z(filt)={base_pos[2]:.3f}")
+                    # --- Logging ---
+                    logging.info(
+                        f"[ID {markerID}] "
+                        f"PnP: X={base_pos_pnp[0]:.3f}, Y={base_pos_pnp[1]:.3f}, Z={base_pos_pnp[2]:.3f} | "
+                        f"Depth: {base_pos_depth if base_pos_depth is not None else 'N/A'} | "
+                        f"Fused: X={fused_pos[0]:.3f}, Y={fused_pos[1]:.3f}, Z={fused_pos[2]:.3f}"
+                    )
 
+                    # --- Save data ---
                     corner_data.append({
                         "marker_id": int(markerID),
-                        "cam_X": float(tvec_marker[0]),
-                        "cam_Y": float(tvec_marker[1]),
-                        "cam_Z": float(tvec_marker[2]),
-                        "base_X_raw": float(raw_base_pos[0]),
-                        "base_Y_raw": float(raw_base_pos[1]),
-                        "base_Z_raw": float(raw_base_pos[2]),
-                        "base_X_filtered": float(base_pos[0]),
-                        "base_Y_filtered": float(base_pos[1]),
-                        "base_Z_filtered": float(base_pos[2]),
-                        "u_center": int(corners[i][0].mean(axis=0)[0]),
-                        "v_center": int(corners[i][0].mean(axis=0)[1])
+                        "cam_X_pnp": float(tvec_pnp[0]),
+                        "cam_Y_pnp": float(tvec_pnp[1]),
+                        "cam_Z_pnp": float(tvec_pnp[2]),
+                        "base_X_pnp": float(base_pos_pnp[0]),
+                        "base_Y_pnp": float(base_pos_pnp[1]),
+                        "base_Z_pnp": float(base_pos_pnp[2]),
+                        "cam_X_depth": float(tvec_depth[0]) if tvec_depth is not None else None,
+                        "cam_Y_depth": float(tvec_depth[1]) if tvec_depth is not None else None,
+                        "cam_Z_depth": float(tvec_depth[2]) if tvec_depth is not None else None,
+                        "base_X_depth": float(base_pos_depth[0]) if base_pos_depth is not None else None,
+                        "base_Y_depth": float(base_pos_depth[1]) if base_pos_depth is not None else None,
+                        "base_Z_depth": float(base_pos_depth[2]) if base_pos_depth is not None else None,
+                        "base_X_fused": float(fused_pos[0]),
+                        "base_Y_fused": float(fused_pos[1]),
+                        "base_Z_fused": float(fused_pos[2]),
+                        "u_center": u_center,
+                        "v_center": v_center
                     })
 
-                    # Overlay text on image
+                    # Overlay text
                     topLeft = tuple(np.intp(corners[i][0][0]))
                     text = (f"ID:{int(markerID)} "
-                            f"Bx:{base_pos[0]:.4f} By:{base_pos[1]:.4f} "
-                            f"Bz:{base_pos[2]:.4f} m")
+                            f"X:{fused_pos[0]:.3f} Y:{fused_pos[1]:.3f} Z:{fused_pos[2]:.3f} m")
                     cv2.putText(
-                        undistorted, text, (topLeft[0], topLeft[1] - 10),
+                        color_image, text, (topLeft[0], topLeft[1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2
                     )
 
             # Draw poses
             result = (corners, ids, rvecs, tvecs)
             color_image_with_pose = ArUcoDetector.getImageWithPose(
-                undistorted, corners, ids, rvecs, tvecs, K, None
+                color_image, corners, ids, rvecs, tvecs, K, None
             )
 
-            tracker.updateTrajectory(frameset, result)
+            tracker.updateTrajectory(frame, result)
 
             cv2.namedWindow('World Frame ArUco Tracking', cv2.WINDOW_NORMAL)
             cv2.imshow('World Frame ArUco Tracking', color_image_with_pose)
@@ -205,9 +262,9 @@ def main():
         if corner_data:
             df = pd.DataFrame(corner_data)
             df.to_csv("aruco_base_frame_coordinates.csv", index=False)
-            print("[INFO] Saved base-frame coordinates to aruco_base_frame_coordinates.csv")
+            logging.info("[INFO] Saved base-frame coordinates to aruco_base_frame_coordinates.csv")
         else:
-            print("[INFO] No marker data captured.")
+            logging.info("[INFO] No marker data captured.")
 
 
 if __name__ == "__main__":
