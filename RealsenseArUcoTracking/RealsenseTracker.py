@@ -10,6 +10,7 @@ from Camera import Camera
 from TrajectoryTracker import TrajectoryTracker
 from ArUcoGenerator import readConfig
 import math
+import os
 
 
 # ---------------- Kalman Filter for smoothing ----------------
@@ -86,9 +87,8 @@ def main():
         handlers=[logging.StreamHandler()]
     )
 
-    dict_to_use, visualize, grey_color, _ = readConfig(
-        "/home/kareem-saleh/Aruco_Marker detector_Final/RealsenseArUcoTracking/RealsenseArUcoTracking/config.json"
-    )
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    dict_to_use, visualize, grey_color, _ = readConfig(config_path)
 
     # ---------------- Load calibration from YAML ----------------
     with open("realsense_calib.yaml", "r") as f:
