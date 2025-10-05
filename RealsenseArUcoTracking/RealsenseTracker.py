@@ -89,6 +89,12 @@ def main():
     camera = Camera()
     camera.startStreaming()
 
+    # Add filters
+    spatial = rs.spatial_filter()
+    temporal = rs.temporal_filter()
+    hole_filling = rs.hole_filling_filter()
+
+
     marker_size = 0.08  # meters
     corner_data = []
     pos_filters = {}
@@ -100,7 +106,19 @@ def main():
     try:
         while True:
             frame = camera.getNextFrame()
-            depth_image, color_image = camera.extractImagesFromFrame(frame)
+
+            # Extract individual frames
+            depth_frame = frame.get_depth_frame()
+            color_frame = frame.get_color_frame()
+
+            # Apply filters
+            depth_frame = spatial.process(depth_frame)
+            depth_frame = temporal.process(depth_frame)
+            depth_frame = hole_filling.process(depth_frame)
+
+            # Convert filtered frames to numpy arrays
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
 
             h, w = color_image.shape[:2]
 
