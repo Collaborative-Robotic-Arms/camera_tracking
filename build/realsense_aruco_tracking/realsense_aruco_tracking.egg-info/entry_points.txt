@@ -1,0 +1,2 @@
+[console_scripts]
+tracker = realsense_aruco_tracking.aruco_pose_node:main

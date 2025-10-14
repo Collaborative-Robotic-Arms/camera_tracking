@@ -176,7 +176,7 @@ def main():
                     if model is not None:
                         try:
                             if use_z_measured:
-                                # ✅ use z_fused as z_measured input
+                                # use z_fused as z_measured input
                                 X_in = np.array([[
                                     (u_center - u_mean) / u_std,
                                     (v_center - v_mean) / v_std,
