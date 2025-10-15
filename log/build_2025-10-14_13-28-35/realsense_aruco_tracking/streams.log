@@ -1,0 +1,21 @@
+[7.370s] Invoking command in '/home/marwan/camera_tracking/src/realsense_aruco_tracking': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/marwan/camera_tracking/build/realsense_aruco_tracking/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/realsense_aruco_tracking build --build-base /home/marwan/camera_tracking/build/realsense_aruco_tracking/build install --record /home/marwan/camera_tracking/build/realsense_aruco_tracking/install.log --single-version-externally-managed install_data
+[7.817s] running egg_info
+[7.853s] writing ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/PKG-INFO
+[7.853s] writing dependency_links to ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/dependency_links.txt
+[7.854s] writing entry points to ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/entry_points.txt
+[7.854s] writing requirements to ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/requires.txt
+[7.854s] writing top-level names to ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/top_level.txt
+[7.926s] reading manifest file '../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/SOURCES.txt'
+[7.928s] writing manifest file '../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info/SOURCES.txt'
+[7.928s] running build
+[7.928s] running build_py
+[7.929s] running install
+[7.938s] running install_lib
+[7.982s] running install_data
+[7.982s] running install_egg_info
+[8.018s] removing '/home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking-0.0.0-py3.12.egg-info' (and everything under it)
+[8.018s] Copying ../../build/realsense_aruco_tracking/realsense_aruco_tracking.egg-info to /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking-0.0.0-py3.12.egg-info
+[8.052s] running install_scripts
+[8.281s] Installing tracker script to /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/realsense_aruco_tracking
+[8.282s] writing list of installed files to '/home/marwan/camera_tracking/build/realsense_aruco_tracking/install.log'
+[8.334s] Invoked command in '/home/marwan/camera_tracking/src/realsense_aruco_tracking' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/marwan/camera_tracking/build/realsense_aruco_tracking/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/realsense_aruco_tracking build --build-base /home/marwan/camera_tracking/build/realsense_aruco_tracking/build install --record /home/marwan/camera_tracking/build/realsense_aruco_tracking/install.log --single-version-externally-managed install_data

@@ -12,17 +12,17 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # Copy config.json into the install/share directory
-        (os.path.join('share', package_name), ['realsense_aruco_tracking/config.json']),
-        ('share/ament_index/resource_index/packages', ['resource/realsense_aruco_tracking']),
-        ('share/realsense_aruco_tracking', ['package.xml']),
-        ('share/realsense_aruco_tracking/config', ['realsense_aruco_tracking/realsense_calib.yaml']),
+
+        # Include config and model files here
+        (os.path.join('share', package_name, 'config'), glob('config/*.json')),
+        (os.path.join('share', package_name, 'calibration'), glob('*.yaml')),
+        (os.path.join('share', package_name, 'models'), glob('height_model_out/*.joblib')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='marwan',
-    maintainer_email='your_email@example.com',
-    description='Aruco marker pose tracking using RealSense camera',
+    maintainer_email='2100771@eng.asu.edu.eg',
+    description='RealSense ArUco tracking and pose publishing node',
     license='MIT',
     tests_require=['pytest'],
     entry_points={

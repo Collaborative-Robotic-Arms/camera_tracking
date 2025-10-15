@@ -1,13 +1,8 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: realsense_aruco_tracking
 Version: 0.0.0
-Summary: Aruco marker pose tracking using RealSense camera
+Summary: RealSense ArUco tracking and pose publishing node
 Maintainer: marwan
-Maintainer-email: your_email@example.com
+Maintainer-email: 2100771@eng.asu.edu.eg
 License: MIT
 Requires-Dist: setuptools
-Dynamic: license
-Dynamic: maintainer
-Dynamic: maintainer-email
-Dynamic: requires-dist
-Dynamic: summary

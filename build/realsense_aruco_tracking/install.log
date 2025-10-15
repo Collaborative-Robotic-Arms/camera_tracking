@@ -12,8 +12,9 @@
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking/__pycache__/Camera.cpython-312.pyc
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/share/ament_index/resource_index/packages/realsense_aruco_tracking
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/package.xml
-/home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/config.json
-/home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/config/realsense_calib.yaml
+/home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/config
+/home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/calibration
+/home/marwan/camera_tracking/install/realsense_aruco_tracking/share/realsense_aruco_tracking/models
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking-0.0.0-py3.12.egg-info/entry_points.txt
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking-0.0.0-py3.12.egg-info/requires.txt
 /home/marwan/camera_tracking/install/realsense_aruco_tracking/lib/python3.12/site-packages/realsense_aruco_tracking-0.0.0-py3.12.egg-info/PKG-INFO

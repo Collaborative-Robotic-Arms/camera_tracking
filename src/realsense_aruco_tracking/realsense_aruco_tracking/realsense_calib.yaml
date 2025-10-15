@@ -8,7 +8,7 @@ dist_coeffs:
          -0.0030859808687108714, -0.005391372766986892,
          -2.547370818352119]
 
-depth_scale: 0.000 # raw scale from RealSense (1 unit = 1 mm)
+depth_scale: 0.001 # raw scale from RealSense (1 unit = 1 mm)
 
 depth_correction:
   a: 0.986898   # slope from linear fit
